@@ -10,26 +10,26 @@ BUILD_DIR		= Build
 #   PY32F003x4, PY32F003x6, PY32F003x8,
 #   PY32F030x6, PY32F030x8, 
 #   PY32F072xB
-MCU_TYPE		= PY32F003x4
+MCU_TYPE		= PY32F030x8
 
 ##### Options #####
 
 # Use LL library instead of HAL, y:yes, n:no
 USE_LL_LIB ?= n
 # Enable printf float %f support, y:yes, n:no
-ENABLE_PRINTF_FLOAT	?= n
+ENABLE_PRINTF_FLOAT	?= y
 # Build with FreeRTOS, y:yes, n:no
 USE_FREERTOS	?= n
 # Build with CMSIS DSP functions, y:yes, n:no
-USE_DSP			?= n
+USE_DSP			?= y
 # Build with Waveshare e-paper lib, y:yes, n:no
 USE_EPAPER		?= n
 # Programmer, jlink or pyocd
-FLASH_PROGRM	?= pyocd
+FLASH_PROGRM	?= jlink
 
 ##### Toolchains #######
 
-ARM_TOOLCHAIN	?= /usr/bin
+ARM_TOOLCHAIN	?= /home/zhangqiang/workspace/gcc-arm/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi/bin
 
 # path to JLinkExe
 JLINKEXE		?= /opt/SEGGER/JLink/JLinkExe
