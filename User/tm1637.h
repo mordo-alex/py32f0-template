@@ -23,5 +23,7 @@ uint8_t TM1637_ReadKeys(void);
 
 // 测试用：检查是否所有段都亮
 void TM1637_Test(void);
+// 在 #endif 前面加上这一行：
+void TM1637_WriteRaw(uint8_t *buff);
 
 #endif

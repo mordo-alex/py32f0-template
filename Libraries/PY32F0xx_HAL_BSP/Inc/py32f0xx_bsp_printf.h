@@ -48,7 +48,7 @@ extern "C" {
 
 #define DEBUG_USART_TX_GPIO_PORT                GPIOA
 #define DEBUG_USART_TX_GPIO_CLK_ENABLE()        __HAL_RCC_GPIOA_CLK_ENABLE()
-#define DEBUG_USART_TX_PIN                      GPIO_PIN_2
+#define DEBUG_USART_TX_PIN                      GPIO_PIN_9
 #define DEBUG_USART_TX_AF                       GPIO_AF1_USART1
 
 #define DEBUG_USART_IRQHandler                  USART1_IRQHandler

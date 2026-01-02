@@ -39,8 +39,8 @@
 #define GUN_HEATER_PORT         GPIOB
 
 // 风扇 -> PA9
-#define GUN_FAN_PIN             GPIO_PIN_9
-#define GUN_FAN_PORT            GPIOA
+#define GUN_FAN_PIN             GPIO_PIN_2
+#define GUN_FAN_PORT            GPIOB
 #define GUN_FAN_ON()            HAL_GPIO_WritePin(GUN_FAN_PORT, GUN_FAN_PIN, GPIO_PIN_SET)
 #define GUN_FAN_OFF()           HAL_GPIO_WritePin(GUN_FAN_PORT, GUN_FAN_PIN, GPIO_PIN_RESET)
 

@@ -29,7 +29,7 @@ FLASH_PROGRM	?= jlink
 
 ##### Toolchains #######
 
-ARM_TOOLCHAIN	?= /home/zhangqiang/workspace/gcc-arm/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi/bin
+ARM_TOOLCHAIN	?= /usr/bin
 
 # path to JLinkExe
 JLINKEXE		?= /opt/SEGGER/JLink/JLinkExe
