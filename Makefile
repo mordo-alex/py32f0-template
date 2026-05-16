@@ -29,7 +29,11 @@ FLASH_PROGRM	?= jlink
 
 ##### Toolchains #######
 
-ARM_TOOLCHAIN	?= /usr/bin
+# 默认给 GitHub Actions 或者系统全局环境用的路径 (如果为空，系统会自动去 $PATH 里找)
+ARM_TOOLCHAIN   ?= 
+
+# 引入本地配置文件（前面的减号 '-' 极其重要，意思是如果找不到这个文件，不要报错，直接跳过！）
+-include local.mk
 
 # path to JLinkExe
 JLINKEXE		?= /opt/SEGGER/JLink/JLinkExe

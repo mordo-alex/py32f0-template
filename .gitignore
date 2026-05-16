@@ -1,3 +1,5 @@
 .vscode/
 /Build*
 /Temp*
+tools/
+local.mk
