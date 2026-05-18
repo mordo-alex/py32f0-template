@@ -41,15 +41,15 @@ extern "C" {
                                                      UNUSED(tmpreg); \
                                                    } while(0U)
 
-#define DEBUG_USART_RX_GPIO_PORT                GPIOA
-#define DEBUG_USART_RX_GPIO_CLK_ENABLE()        __HAL_RCC_GPIOA_CLK_ENABLE()
+#define DEBUG_USART_RX_GPIO_PORT                GPIOF
+#define DEBUG_USART_RX_GPIO_CLK_ENABLE()        __HAL_RCC_GPIOF_CLK_ENABLE()
 #define DEBUG_USART_RX_PIN                      GPIO_PIN_0
-#define DEBUG_USART_RX_AF                       GPIO_AF1_USART1
+#define DEBUG_USART_RX_AF                       GPIO_AF8_USART1
 
-#define DEBUG_USART_TX_GPIO_PORT                GPIOA
-#define DEBUG_USART_TX_GPIO_CLK_ENABLE()        __HAL_RCC_GPIOA_CLK_ENABLE()
+#define DEBUG_USART_TX_GPIO_PORT                GPIOF
+#define DEBUG_USART_TX_GPIO_CLK_ENABLE()        __HAL_RCC_GPIOF_CLK_ENABLE()
 #define DEBUG_USART_TX_PIN                      GPIO_PIN_1
-#define DEBUG_USART_TX_AF                       GPIO_AF1_USART1
+#define DEBUG_USART_TX_AF                       GPIO_AF8_USART1
 
 #define DEBUG_USART_IRQHandler                  USART1_IRQHandler
 #define DEBUG_USART_IRQ                         USART1_IRQn

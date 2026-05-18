@@ -70,7 +70,8 @@ int main(void)
 
         // 【测试 1】: 纯心跳包（证明串口没卡死）
         printf("[Sys] Heartbeat ticking...\r\n");
-
+        // 假设你的串口句柄叫 DebugUartHandle。如果是 huart1，就把第一个参数换成 &huart1
+        HAL_UART_Transmit(&DebugUartHandle, (uint8_t *)"ALIVE!\r\n", 8, 1000);
         // 【测试 2】: 读 ADC（等你配置好 ADC 后把下面的注释打开）
         /*
         uint32_t t12_adc_raw = HAL_ADC_GetValue(&hadc); // 假设你用的标准 HAL 轮询读取

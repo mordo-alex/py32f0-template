@@ -42,7 +42,7 @@ HAL_StatusTypeDef BSP_HSE_ClockConfig(void)
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_ON;                                     /* Turn on HSE */
+  RCC_OscInitStruct.HSEState = RCC_HSE_OFF;                                     /* Turn on HSE */
   RCC_OscInitStruct.HSEFreq = (RCC_ECSCR_HSE_FREQ_0 | RCC_ECSCR_HSE_FREQ_1);   /* HSE frequency range */
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -134,7 +134,7 @@ HAL_StatusTypeDef BSP_HSE_PLL_ClockConfig(void)
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_ON;                            /* Turn on HSE */
+  RCC_OscInitStruct.HSEState = RCC_HSE_OFF;                            /* Turn on HSE */
   RCC_OscInitStruct.HSEFreq = RCC_HSE_16_32MHz;                       /* HSE frequency range */
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;                        /* PLL ON */
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;                /* PLL clock source from HSE (freq >= 12MHz) */
