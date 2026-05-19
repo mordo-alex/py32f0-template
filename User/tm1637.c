@@ -1,6 +1,7 @@
 #include "tm1637.h"
 #include "board_config.h"
 #include <stdio.h> 
+#include "advanced_tools.h"
 
 // ==========================================
 //  底层 GPIO 及读取宏
@@ -92,15 +93,57 @@ void TM1637_WriteRaw(uint8_t *buff) {
 //  ★ 核心显示控制 (真正的 3 阶段状态机)
 // ==========================================
 void TM1637_Update(void) {
-    uint8_t raw_buff[6]; 
+    uint8_t raw_buff[6] = {0}; 
     static uint8_t dp_frame = 0; 
     static uint8_t anim_divider = 0;
+    static uint8_t blink_tick = 0; // 新增：用于闪烁动画的节拍器
     
+    // --- 全局动画节拍器 ---
     if(++anim_divider >= 2) { 
         anim_divider = 0;
         dp_frame = (dp_frame + 1) % 3; 
+        blink_tick = (blink_tick + 1) % 4; // 闪烁节拍：0,1,2,3 循环
     }
 
+    // ==================================================
+    // ★ 拦截层：高级工厂菜单霸屏模式
+    // ==================================================
+    if (sys_menu_active) {
+        // 左边显示 F-1/2/3
+        raw_buff[2] = 0x71; // 完美渲染大写字母 'F'
+        raw_buff[1] = 0x40; // 中间横杠 '-'
+        raw_buff[0] = SegmentMap[sys_menu_num]; // 显示当前选中的功能号
+        
+        // 右边风枪显示灭掉，保持屏幕专注
+        raw_buff[5] = 0x00; 
+        raw_buff[3] = 0x00; 
+        raw_buff[4] = 0x00;
+
+        // ★ 小数点状态机特效
+        if (sys_anim_state == ANIM_CYCLING) {
+            // 正在处理：跑马灯循环
+            if (dp_frame == 0) raw_buff[2] |= 0x20;
+            if (dp_frame == 1) raw_buff[1] |= 0x20;
+            if (dp_frame == 2) raw_buff[0] |= 0x20;
+        } 
+        else if (sys_anim_state == ANIM_FLASHING) {
+            // 处理完成：齐闪 3 下 (通过 blink_tick < 2 控制亮半周期，灭半周期)
+            if (blink_tick < 2) {
+                raw_buff[2] |= 0x20; raw_buff[1] |= 0x20; raw_buff[0] |= 0x20;
+            }
+        } 
+        else if (sys_anim_state == ANIM_SOLID) {
+            // 最终锁定：3个小数点全部常亮
+            raw_buff[2] |= 0x20; raw_buff[1] |= 0x20; raw_buff[0] |= 0x20;
+        }
+
+        TM1637_WriteRaw(raw_buff);
+        return; // ★ 拦截成功，直接返回！阻止下方的正常渲染！
+    }
+
+    // ==================================================
+    // ★ 正常工作模式：数值与调整渲染 (保留你的原版逻辑)
+    // ==================================================
     raw_buff[2] = SegmentMap[iron_target_temp / 100];
     raw_buff[1] = SegmentMap[(iron_target_temp / 10) % 10];
     raw_buff[0] = SegmentMap[iron_target_temp % 10];
@@ -116,7 +159,6 @@ void TM1637_Update(void) {
         if (iron_adjust_ticks == 0) {
             // 设定时间结束，触发加热动作！
             iron_heating_ticks = 60; // 模拟加热 3 秒
-            // 未来这里可以加上： PID_SetTarget(iron_target_temp);
         }
     } else if (iron_heating_ticks > 0) {
         // 【状态2: 加热中】PID 介入，跑马灯转起来！

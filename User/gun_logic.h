@@ -1,34 +1,45 @@
 #ifndef __GUN_LOGIC_H
 #define __GUN_LOGIC_H
 
-#include <stdint.h>
-#include <stdbool.h>
+#include "py32f0xx_hal.h"
 
-// 风枪的状态定义
+// ==========================================
+// ★ 硬件引脚宏定义
+// ==========================================
+#define GUN_FAN_PORT        GPIOB
+#define GUN_FAN_PIN         GPIO_PIN_2
+
+#define GUN_HEAT_PORT       GPIOB
+#define GUN_HEAT_PIN        GPIO_PIN_7
+
+#define GUN_REED_PORT       GPIOA
+#define GUN_REED_PIN        GPIO_PIN_8
+
+// ==========================================
+// ★ 风枪专属 PID 参数结构体 (彻底解决命名冲突)
+// ==========================================
+typedef struct {
+    float Kp;
+    float Ki;
+    float Kd;
+} GunPID_Config_t;
+
+extern GunPID_Config_t gun_pid; // 暴露全局变量
+
 typedef enum {
-    GUN_STATE_OFF = 0,      // 彻底关机 (风扇停，加热停)
-    GUN_STATE_HEATING,      // 正常工作 (风扇转，PID控制)
-    GUN_STATE_COOLING,      // 冷却模式 (风扇转，加热停) - 比如放回架子，或关机后余热未散
-    GUN_STATE_ERROR         // 故障 (如风扇堵转)
+    GUN_STANDBY = 0,
+    GUN_RUNNING,
+    GUN_COOLING,
+    GUN_ERROR,
+    GUN_AUTO_TUNING   // 自整定状态
 } GunState_t;
 
-// 输入信号 (传感器 + 开关)
-typedef struct {
-    uint16_t current_temp;  // 当前温度 (ADC值或摄氏度)
-    bool     sw_is_on;      // 总开关是否开启 (1=开, 0=关)
-    bool     handle_is_up;  // 手柄是否拿起来 (1=拿起, 0=在架子上)
-    bool     fan_locked;    // (选配) 风扇是否堵转
-} GunInputs_t;
+void Gun_Init(void);
+void Gun_Process(int target_temp);
+int Gun_GetRealTemp(void);
+GunState_t Gun_GetState(void);
 
-// 输出控制 (告诉 main 函数该干嘛)
-typedef struct {
-    bool     fan_on;        // 是否开风扇
-    bool     heat_enable;   // 是否允许加热 (PID计算的前提)
-    GunState_t state;       // 当前状态 (用于显示屏判断显示内容)
-} GunOutputs_t;
-
-// 核心函数
-void Gun_FSM_Init(void);
-GunOutputs_t Gun_FSM_Run(GunInputs_t *inputs);
+// 触发自整定大招
+void Gun_Start_AutoTune(int tune_target_temp);
 
 #endif
