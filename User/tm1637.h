@@ -10,7 +10,7 @@
 
 // 初始化
 void TM1637_Init(void);
-
+/*
 // 设置亮度 (0~7)
 void TM1637_SetBrightness(uint8_t brightness);
 
@@ -25,5 +25,6 @@ uint8_t TM1637_ReadKeys(void);
 void TM1637_Test(void);
 // 在 #endif 前面加上这一行：
 void TM1637_WriteRaw(uint8_t *buff);
-
+*/
+void TM1637_ProcessUI(void);
 #endif
