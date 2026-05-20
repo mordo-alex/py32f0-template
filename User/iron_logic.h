@@ -3,11 +3,14 @@
 
 #include "py32f0xx_hal.h"
 
+// ==========================================
+// ★ 硬件引脚映射 (严格按照你的新表纠正！)
+// ==========================================
 #define IRON_HEAT_PORT          GPIOB
-#define IRON_HEAT_PIN           GPIO_PIN_6
+#define IRON_HEAT_PIN           GPIO_PIN_5  // ★ 烙铁加热移到 PB5
 
-#define IRON_MASTER_SW_PORT     GPIOA
-#define IRON_MASTER_SW_PIN      GPIO_PIN_1
+#define IRON_MASTER_SW_PORT     GPIOB
+#define IRON_MASTER_SW_PIN      GPIO_PIN_6  // ★ 烙铁总开关是 PB6
 
 typedef enum {
     IRON_OFF = 0,

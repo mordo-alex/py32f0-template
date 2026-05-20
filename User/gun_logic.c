@@ -10,6 +10,8 @@
 
 #define IS_ON_CRADLE()          (HAL_GPIO_ReadPin(GUN_REED_PORT, GUN_REED_PIN) == GPIO_PIN_RESET)
 
+#define IS_GUN_SWITCH_ON()     (HAL_GPIO_ReadPin(GUN_MASTER_SW_PORT, GUN_MASTER_SW_PIN) == GPIO_PIN_RESET)
+
 // ADC 引脚映射
 #define ADC_PORT                GPIOA
 #define ADC_PIN                 GPIO_PIN_3
@@ -31,6 +33,11 @@ void Gun_Init(void) {
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_ADC_CLK_ENABLE();
+
+    GPIO_InitStruct.Pin = GUN_MASTER_SW_PIN;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(GUN_MASTER_SW_PORT, &GPIO_InitStruct);
 
     GPIO_InitStruct.Pin = GUN_FAN_PIN;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -171,52 +178,46 @@ void Gun_Start_AutoTune(int target_temp) {
 void Gun_Process(int target_temp) {
     Update_Real_Temp();
 
+    // ★ 拦截器：如果开关断开，强制关机
+    if (!IS_GUN_SWITCH_ON()) {
+        current_state = GUN_OFF;
+        HEATER_OFF(); 
+        if (current_real_temp > 100) { FAN_RUN(); } else { FAN_KILL(); }
+        return; 
+    }
+
+    // ★ 致命补丁：只要开关闭合，如果此时还在 OFF 状态，立刻复活到 STANDBY 状态！
+    if (current_state == GUN_OFF) {
+        current_state = GUN_STANDBY;
+    }
+
     if (current_real_temp >= 500) current_state = GUN_ERROR;
 
     switch (current_state) {
-        case GUN_STANDBY:
-            HEATER_OFF();
-            FAN_KILL();
-            if (!IS_ON_CRADLE()) {
-                FAN_RUN();
-                current_state = GUN_RUNNING;
-            }
+        case GUN_OFF:
             break;
-
+        case GUN_STANDBY:
+            HEATER_OFF(); FAN_KILL();
+            if (!IS_ON_CRADLE()) { FAN_RUN(); current_state = GUN_RUNNING; }
+            break;
         case GUN_RUNNING:
             FAN_RUN();
-            if (IS_ON_CRADLE()) {
-                HEATER_OFF();
-                current_state = GUN_COOLING;
-            } else {
-                int power = Gun_PID_Compute(current_real_temp, target_temp);
-                Software_PWM_Drive(power);
-            }
+            if (IS_ON_CRADLE()) { HEATER_OFF(); current_state = GUN_COOLING; } 
+            else { Software_PWM_Drive(Gun_PID_Compute(current_real_temp, target_temp)); }
             break;
-
         case GUN_COOLING:
-            HEATER_OFF();
-            FAN_RUN();
-            if (!IS_ON_CRADLE()) {
-                current_state = GUN_RUNNING;
-            }
-            else if (current_real_temp <= 100) {
-                current_state = GUN_STANDBY;
-            }
+            HEATER_OFF(); FAN_RUN();
+            if (!IS_ON_CRADLE()) { current_state = GUN_RUNNING; }
+            else if (current_real_temp <= 100) { current_state = GUN_STANDBY; }
             break;
-
         case GUN_ERROR:
-            HEATER_OFF();
-            FAN_KILL();
+            HEATER_OFF(); FAN_KILL();
             break;
-
         case GUN_AUTO_TUNING:
-            if (IS_ON_CRADLE()) {
-                printf("[Gun-Tune] ABORTED by user!\r\n");
-                current_state = GUN_COOLING;
-            } else {
-                Process_AutoTune();
-            }
+            if (IS_ON_CRADLE()) { current_state = GUN_COOLING; } 
+            else { Process_AutoTune(); }
+            break;
+        default:
             break;
     }
 }

@@ -2,31 +2,54 @@
 #include "board_config.h"
 #include "tm1637.h"
 #include "py32f0xx_hal.h"
+#include "adc_core.h"
+#include "iron_logic.h"
+#include "gun_logic.h"
+#include "advanced_tools.h"
+
+int iron_target_temp = 300;
+int gun_target_temp = 200;
 
 int main(void)
 {
-    // 1. 底层外设初始化
     HAL_Init();
     Board_Init();
-    TM1637_Init();
     BSP_USART_Config();
 
-    // 2. 打印开机横幅
-    printf("\r\n");
-    printf("=================================\r\n");
+    printf("\r\n=================================\r\n");
     printf("  Dual Station: T12 + 858 V2.0   \r\n");
-    printf("  UI Engine Boot UP... OK!       \r\n");
+    printf("  Decoupled Engine Booting...    \r\n");
+    
+    TM1637_Init();         
+    ADC_Core_Init();        
+    Iron_Init();            
+    Gun_Init();             
+    Advanced_Tools_Init();  
+
+    printf("  All Modules Ready!             \r\n");
     printf("=================================\r\n");
 
-    // 3. 终极主循环
+    uint32_t debug_tick = 0;
+
     while (1)
     {
-        // 把所有的 UI 交互、按键防抖、数码管刷新全部交托给 TM1637 模块
+        // 1. UI 交互与屏幕渲染引擎
         TM1637_ProcessUI();
 
-        // 给主循环加一点延时。50ms 是人类按键最舒服的防抖间隔
-        // 以后加了 PID 运算，也不影响这 50ms 的 UI 刷新率
-        HAL_Delay(50); 
+        // 2. 核心状态机护驾
+        Iron_Process(iron_target_temp);
+        Gun_Process(gun_target_temp);
+
+        // 3. 硬件雷达：每秒打印一次物理开关真实电平
+        if (HAL_GetTick() - debug_tick > 1000) {
+            debug_tick = HAL_GetTick();
+            int iron_sw = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_6); 
+            int gun_sw  = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8);
+            printf("[Radar] Iron SW(PB6): %d | Gun SW(PA8): %d\r\n", iron_sw, gun_sw);
+        }
+
+        // 4. 50ms 心跳
+        HAL_Delay(50);
     }
 }
 

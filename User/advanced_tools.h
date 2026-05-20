@@ -3,21 +3,27 @@
 
 #include "py32f0xx_hal.h"
 
-// 菜单动画状态机枚举
+// 菜单动画状态机
 typedef enum {
-    ANIM_NONE = 0,      // 菜单选择状态
-    ANIM_CYCLING,       // 正在执行：小数点跑马灯循环
-    ANIM_FLASHING,      // 执行完毕：3个小数点同时闪烁
-    ANIM_SOLID          // 最终锁定：3个小数点常亮
+    ANIM_NONE = 0,
+    ANIM_CYCLING,
+    ANIM_FLASHING,
+    ANIM_SOLID
 } AnimState_t;
 
-// 暴漏给 tm1637.c 用于屏幕接管的全局变量
-extern uint8_t sys_menu_active; // 0=正常, 1=进入高级菜单
-extern uint8_t sys_menu_num;    // 1=F-1, 2=F-2, 3=F-3
+// 暴漏给显示层的只读状态
+extern uint8_t sys_menu_active; 
+extern uint8_t sys_menu_num;    
 extern AnimState_t sys_anim_state;
 
+// ★ 纯血解耦的 API 接口
 void Advanced_Tools_Init(void);
-void Advanced_Menu_Task(uint8_t current_key);
-void Advanced_Notify_Job_Done(void); // 外部任务完成时调用
+void Advanced_Menu_Enable(void);        // 开启菜单
+void Advanced_Menu_Disable(void);       // 关闭菜单
+void Advanced_Menu_Navigate(int step);  // 翻页 (1 或 -1)
+void Advanced_Menu_Confirm(void);       // 确认执行
+void Advanced_Menu_ResetIdle(void);     // 重置超时防呆计数器
+void Advanced_Menu_Tick(void);          // 放在主循环跑动画和超时
+void Advanced_Notify_Job_Done(void);    // 底层任务完成回调
 
 #endif

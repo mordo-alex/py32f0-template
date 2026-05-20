@@ -3,6 +3,8 @@
 
 // 宏定义：允许的最大突变刻度（超过判定为尖峰脉冲）
 #define ADC_MAX_JUMP        300  
+// 定义 LM358 正常情况下的极限底噪 (防止热开机误判)
+#define MAX_VALID_ZERO_OFFSET  150
 
 ADC_HandleTypeDef hadc_core;
 
@@ -140,4 +142,37 @@ uint16_t ADC_Read_Gun_Lazy(void) {
     }
 
     return (uint16_t)(gun_filter_val >> 3);
+}
+
+/**
+  * @brief 高级功能：工厂级运放底噪捕捉 (由组合键触发)
+  */
+void ADC_Factory_Calibrate_Zero(void) {
+    ADC_ChannelConfTypeDef sConfig = {0};
+    uint32_t sum = 0;
+
+    HAL_ADC_Stop(&hadc_core);
+    sConfig.Channel = IRON_ADC_CH;
+    sConfig.Rank = ADC_RANK_CHANNEL_NUMBER;
+    sConfig.SamplingTime = ADC_SAMPLETIME_239CYCLES_5;
+    HAL_ADC_ConfigChannel(&hadc_core, &sConfig);
+
+    // 连续抓取 20 次求平均，求最稳的底噪
+    for(int i = 0; i < 20; i++) {
+        HAL_ADC_Start(&hadc_core);
+        HAL_ADC_PollForConversion(&hadc_core, 5);
+        sum += HAL_ADC_GetValue(&hadc_core);
+    }
+
+    uint16_t captured_avg = sum / 20;
+
+    // 热开机防呆判定：如果读数太大，说明烙铁头是热的，绝对不能校准！
+    if (captured_avg > MAX_VALID_ZERO_OFFSET) {
+        printf("[ADC] CAL FAILED! Iron is too hot! (%d > %d)\r\n", captured_avg, MAX_VALID_ZERO_OFFSET);
+    } else {
+        // 如果很小，说明是冷机，安全更新底噪！
+        iron_zero_offset = captured_avg;
+        printf("[ADC] CAL SUCCESS! Zero Offset = %d\r\n", iron_zero_offset);
+        // ★ 未来预留：这里可以加上把 iron_zero_offset 写入 Flash 的代码
+    }
 }

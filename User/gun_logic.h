@@ -4,7 +4,7 @@
 #include "py32f0xx_hal.h"
 
 // ==========================================
-// ★ 硬件引脚宏定义
+// ★ 硬件引脚宏定义 (严格按照你的新表纠正！)
 // ==========================================
 #define GUN_FAN_PORT        GPIOB
 #define GUN_FAN_PIN         GPIO_PIN_2
@@ -12,8 +12,12 @@
 #define GUN_HEAT_PORT       GPIOB
 #define GUN_HEAT_PIN        GPIO_PIN_7
 
-#define GUN_REED_PORT       GPIOA
-#define GUN_REED_PIN        GPIO_PIN_8
+#define GUN_MASTER_SW_PORT  GPIOA
+#define GUN_MASTER_SW_PIN   GPIO_PIN_8  // ★ 风枪总开关是 PA8
+
+#define GUN_REED_PORT       GPIOB
+#define GUN_REED_PIN        GPIO_PIN_4  // ★ 休眠干簧管先挪到 PB4 避让
+
 
 // ==========================================
 // ★ 风枪专属 PID 参数结构体 (彻底解决命名冲突)
@@ -27,7 +31,8 @@ typedef struct {
 extern GunPID_Config_t gun_pid; // 暴露全局变量
 
 typedef enum {
-    GUN_STANDBY = 0,
+    GUN_OFF = 0,
+    GUN_STANDBY,
     GUN_RUNNING,
     GUN_COOLING,
     GUN_ERROR,
