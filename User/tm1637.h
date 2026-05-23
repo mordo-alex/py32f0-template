@@ -3,28 +3,26 @@
 
 #include "py32f0xx_hal.h"
 
-// 亮度设置 (0-7)
-#define TM1637_BRIGHTNESS_MIN   0
-#define TM1637_BRIGHTNESS_MAX   7
-#define TM1637_BRIGHTNESS_DEF   2
+typedef enum {
+    UI_MODE_OFF = 0,    // 关机熄屏
+    UI_MODE_NORMAL,     // 正常显示数字
+    UI_MODE_ERROR,      // 报错显示 (---)
+    UI_MODE_MENU        // 菜单显示 (F-x)
+} UI_Mode_t;
 
-// 初始化
+// ★ 纯净的数据结构，不掺杂任何业务变量
+typedef struct {
+    UI_Mode_t iron_mode;
+    int iron_val;       
+    uint8_t iron_anim;  // 0:常亮, 1:跑马灯
+
+    UI_Mode_t gun_mode;
+    int gun_val;        
+    uint8_t gun_anim;   
+} UI_DisplayData_t;
+
 void TM1637_Init(void);
-/*
-// 设置亮度 (0~7)
-void TM1637_SetBrightness(uint8_t brightness);
+uint8_t TM1637_ReadKeys(void); 
+void TM1637_UpdateDisplay(UI_DisplayData_t *data); // ★ 唯一的渲染入口
 
-// 核心功能：刷新显示
-// iron_temp: 烙铁温度 (0-999)
-// gun_temp:  风枪温度 (0-999)
-void TM1637_Update(int iron_temp, int gun_temp);
-
-uint8_t TM1637_ReadKeys(void);
-
-// 测试用：检查是否所有段都亮
-void TM1637_Test(void);
-// 在 #endif 前面加上这一行：
-void TM1637_WriteRaw(uint8_t *buff);
-*/
-void TM1637_ProcessUI(void);
 #endif
