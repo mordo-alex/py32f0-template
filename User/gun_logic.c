@@ -10,14 +10,12 @@
 #endif
 
 // ==========================================
-// ★ 底层动作宏定义
+// ★ 动作宏定义
 // ==========================================
 #define FAN_KILL()              HAL_GPIO_WritePin(GUN_FAN_PORT, GUN_FAN_PIN, GPIO_PIN_SET)
 #define FAN_RUN()               HAL_GPIO_WritePin(GUN_FAN_PORT, GUN_FAN_PIN, GPIO_PIN_RESET)
 
-// 0V (RESET) 灌入电流导通光耦 -> 开始加热
 #define HEATER_ON()             HAL_GPIO_WritePin(GUN_HEAT_PORT, GUN_HEAT_PIN, GPIO_PIN_RESET)
-// 5V (SET) 消除电位差关闭光耦 -> 停止加热
 #define HEATER_OFF()            HAL_GPIO_WritePin(GUN_HEAT_PORT, GUN_HEAT_PIN, GPIO_PIN_SET)
 
 #define IS_ON_CRADLE()          (HAL_GPIO_ReadPin(GUN_REED_PORT, GUN_REED_PIN) == GPIO_PIN_RESET)
@@ -27,11 +25,10 @@ GunPID_Config_t gun_pid = { .Kp = 2.0f, .Ki = 0.1f, .Kd = 1.0f };
 static GunState_t current_state = GUN_STANDBY;
 static GunState_t prev_state = GUN_STANDBY; 
 static int current_real_temp = 25;
+
+static uint16_t raw_adc_val = 0; 
 static int tune_target = 0;
 static int tune_cycles = 0;
-
-// ★ 新增：风枪安全武装锁 (0=未武装，1=已武装允许加热)
-static uint8_t gun_armed = 0; 
 
 void Gun_Init(void)
 {
@@ -55,7 +52,6 @@ void Gun_Init(void)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     HAL_GPIO_Init(GUN_FAN_PORT, &GPIO_InitStruct);
-    
     FAN_KILL();
 
     GPIO_InitStruct.Pin = GUN_HEAT_PIN;
@@ -63,21 +59,23 @@ void Gun_Init(void)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     HAL_GPIO_Init(GUN_HEAT_PORT, &GPIO_InitStruct);
-    
     HEATER_OFF();
 
-    gun_armed = 0; // 开机默认未武装
-    GUN_LOG("Init OK. Unarmed.\r\n");
+    GUN_LOG("Gun Hardware Init OK.\r\n");
 }
 
 static void Update_Real_Temp(void)
 {
-    uint16_t raw_adc = ADC_Read_Gun_Lazy();
-    current_real_temp = (raw_adc * 500) / 4095; 
+    raw_adc_val = ADC_Read_Gun_Lazy();
     
-    if (current_real_temp > 480)
+    // ★ 恢复开路检测！只要 ADC 飙到 2800 以上，说明测温脚悬空(拔出)
+    if (raw_adc_val > 2800)
     {
-        current_real_temp = 999;
+        current_real_temp = 999; // 999 为开路标志
+    }
+    else
+    {
+        current_real_temp = (raw_adc_val * 500) / 2048; 
     }
 }
 
@@ -124,7 +122,6 @@ static int Gun_PID_Compute(int current, int target)
     {
         integral = 100;
     }
-    
     if (integral < 0)
     {
         integral = 0;
@@ -132,14 +129,12 @@ static int Gun_PID_Compute(int current, int target)
 
     D_out = gun_pid.Kd * (error - error_prev);
     error_prev = error;
-
     output = (int)(P_out + integral + D_out);
 
     if (output > 100)
     {
         output = 100;
     }
-    
     if (output < 0)
     {
         output = 0;
@@ -159,7 +154,6 @@ static void Process_AutoTune(void)
     if (heater_state == 1)
     {
         Software_PWM_Drive(100);
-        
         if (current_real_temp > tune_target)
         {
             heater_state = 0;
@@ -168,7 +162,6 @@ static void Process_AutoTune(void)
     else
     {
         Software_PWM_Drive(0);
-        
         if (current_real_temp < tune_target)
         {
             heater_state = 1;
@@ -203,93 +196,106 @@ void Gun_Process(int target_temp)
 {
     Update_Real_Temp();
 
-    if (!IS_GUN_SWITCH_ON())
+    // ==========================================
+    // ★ 变态级硬件引脚追踪 Log
+    // ==========================================
+    static uint8_t last_sw = 0xFF;
+    static uint8_t last_cradle = 0xFF;
+    static uint8_t last_plug = 0xFF;
+    
+    uint8_t curr_sw = IS_GUN_SWITCH_ON();
+    uint8_t curr_cradle = IS_ON_CRADLE();
+    uint8_t curr_plug = (current_real_temp == 999) ? 0 : 1; // 0=拔出, 1=插上
+
+    if (curr_sw != last_sw)
+    {
+        GUN_LOG(">>> EVENT: Main Switch [PA8] -> %s <<<\r\n", curr_sw ? "ON (闭合)" : "OFF (断开)");
+        last_sw = curr_sw;
+    }
+
+    if (curr_cradle != last_cradle)
+    {
+        GUN_LOG(">>> EVENT: Reed Switch [PB4] -> %s <<<\r\n", curr_cradle ? "GROUNDED (在架子上)" : "HIGH (拿起来了)");
+        last_cradle = curr_cradle;
+    }
+
+    if (curr_plug != last_plug)
+    {
+        GUN_LOG(">>> EVENT: Aviation Plug -> %s (Raw ADC: %d) <<<\r\n", curr_plug ? "INSERTED (已插上)" : "REMOVED (已拔出)", raw_adc_val);
+        last_plug = curr_plug;
+    }
+
+    // ==========================================
+    // ★ 核心状态机流转 (加入航插检测)
+    // ==========================================
+    if (!curr_sw)
     {
         current_state = GUN_OFF;
-        HEATER_OFF();
-        
-        if (current_real_temp > 100)
-        {
-            FAN_RUN();
-        }
-        else
-        {
-            FAN_KILL();
-        }
-        
-        gun_armed = 0; // 断开开关，立刻剥夺武装
-        return; 
     }
-
-    if (current_state == GUN_OFF)
+    else if (current_state == GUN_OFF)
     {
         current_state = GUN_STANDBY;
-        gun_armed = 0; // 刚合上开关，强制要求先放回架子
-        GUN_LOG("Switch ON, Wait for Cradle.\r\n");
+    }
+    
+    // 如果开关闭合，处理航插异常状态
+    if (curr_sw)
+    {
+        if (current_real_temp == 999 && current_state != GUN_ERROR)
+        {
+            // 一旦发现是 999(拔出)，无条件切入 ERROR
+            current_state = GUN_ERROR;
+        }
+        else if (current_state == GUN_ERROR && current_real_temp != 999)
+        {
+            // 从 ERROR 恢复时，回到 STANDBY
+            current_state = GUN_STANDBY;
+        }
     }
 
-    // 报错复活逻辑
-    if (current_real_temp >= 500)
-    {
-        current_state = GUN_ERROR;
-    }
-    else if ((current_state == GUN_ERROR) && (current_real_temp < 500))
-    {
-        current_state = GUN_STANDBY; 
-        GUN_LOG("Sensor restored.\r\n");
-    }
-
+    // 状态变更 Log
     if (current_state != prev_state)
     {
         switch(current_state)
         {
-            case GUN_OFF:
-                GUN_LOG("State -> OFF\r\n");
-                break;
-            case GUN_STANDBY:
-                GUN_LOG("State -> STANDBY\r\n");
-                break;
-            case GUN_RUNNING:
-                GUN_LOG("State -> RUNNING\r\n");
-                break;
-            case GUN_COOLING:
-                GUN_LOG("State -> COOLING\r\n");
-                break;
-            case GUN_ERROR:
-                GUN_LOG("State -> ERROR!\r\n");
-                break;
-            default:
-                break;
+            case GUN_OFF:       GUN_LOG("=== STATE: -> OFF ===\r\n"); break;
+            case GUN_STANDBY:   GUN_LOG("=== STATE: -> STANDBY ===\r\n"); break;
+            case GUN_RUNNING:   GUN_LOG("=== STATE: -> RUNNING ===\r\n"); break;
+            case GUN_COOLING:   GUN_LOG("=== STATE: -> COOLING ===\r\n"); break;
+            case GUN_ERROR:     GUN_LOG("=== STATE: -> ERROR (No Plug) ===\r\n"); break;
+            case GUN_AUTO_TUNING: GUN_LOG("=== STATE: -> AUTO TUNING ===\r\n"); break;
+            default: break;
         }
         prev_state = current_state;
     }
 
+    // 状态机执行
     switch (current_state)
     {
         case GUN_OFF:
+            HEATER_OFF();
+            FAN_KILL();
+            break;
+
+        case GUN_ERROR:
+            // 拔出航插，强杀所有输出，确保绝对安全！
+            HEATER_OFF();
+            FAN_KILL();
             break;
             
         case GUN_STANDBY:
             HEATER_OFF();
             FAN_KILL();
             
-            // 核心安全补丁：必须检测到一次放回架子，才允许解锁武装
-            if (IS_ON_CRADLE())
-            {
-                gun_armed = 1; 
-            }
-            
-            // 只有处于武装状态，且被拿起来，才进入运行
-            if (!IS_ON_CRADLE() && gun_armed)
+            if (!curr_cradle)
             { 
-                FAN_RUN(); 
                 current_state = GUN_RUNNING; 
             }
             break;
             
         case GUN_RUNNING:
-            FAN_RUN();
-            if (IS_ON_CRADLE())
+            FAN_RUN(); 
+            
+            if (curr_cradle)
             {
                 HEATER_OFF();
                 current_state = GUN_COOLING;
@@ -302,27 +308,23 @@ void Gun_Process(int target_temp)
             
         case GUN_COOLING:
             HEATER_OFF();
-            FAN_RUN();
-            if (!IS_ON_CRADLE())
+            FAN_RUN(); 
+            
+            if (!curr_cradle)
             {
                 current_state = GUN_RUNNING;
             }
+            // 冷却完毕，正常关机
             else if (current_real_temp <= 100)
             {
                 current_state = GUN_STANDBY;
             }
             break;
             
-        case GUN_ERROR: 
-            HEATER_OFF(); 
-            FAN_KILL(); 
-            gun_armed = 0; // 报错时自动剥夺武装
-            break;
-            
         case GUN_AUTO_TUNING:
-            if (IS_ON_CRADLE())
+            if (curr_cradle)
             {
-                GUN_LOG("Tune ABORTED!\r\n");
+                GUN_LOG("Tune ABORTED (Returned to cradle)!\r\n");
                 current_state = GUN_COOLING;
             }
             else
@@ -330,15 +332,11 @@ void Gun_Process(int target_temp)
                 Process_AutoTune();
             }
             break;
+            
+        default:
+            break;
     }
 }
 
-int Gun_GetRealTemp(void)
-{
-    return current_real_temp;
-}
-
-GunState_t Gun_GetState(void)
-{
-    return current_state;
-}
+int Gun_GetRealTemp(void) { return current_real_temp; }
+GunState_t Gun_GetState(void) { return current_state; }
